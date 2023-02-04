@@ -2,7 +2,8 @@
 
 namespace CovidDataApi.Models
 {
-    [Index(nameof(County), nameof(State), nameof(Date))]
+    [Index(nameof(County), nameof(TotalDailyCases), nameof(Date), IsDescending = new[] { false, true, false})]
+    [Index(nameof(State), nameof(TotalDailyCases), nameof(Date), IsDescending = new[] { false, true, false })]
     public class DailyCasesModel
     {
         public int ID { get; set; }

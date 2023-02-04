@@ -5,8 +5,11 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ICovidDataContext, CovidDataContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("Default") ?? throw new InvalidOperationException("Connection string 'Default' not found.")));
-builder.Services.AddTransient<IRepoService, RepoService>();
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("Default") ?? throw new InvalidOperationException("Connection string 'Default' not found."));
+});
+    
+builder.Services.AddScoped<IRepoService, RepoService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

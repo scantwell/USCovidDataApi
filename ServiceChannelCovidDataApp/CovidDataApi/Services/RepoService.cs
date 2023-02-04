@@ -41,15 +41,27 @@ public class RepoService : IRepoService
     {
         bool isState = IsState(location);
         var query = GetBaseQuery(location, startDate, endDate, isState);
-        var records = await query.OrderBy(c => c.Date).ToListAsync();
-
+        DailyCasesModel? info = null;
+        if (!isState)
+        {
+            info = query.Take(1).ToList().FirstOrDefault();
+        }
+        query = GetBaseQuery(location, startDate, endDate, isState);
+        var records = await query.TagWith("GetTotalCases")
+            .OrderBy(c => c.Date).Select(c => new
+            {
+                c.Date,
+                c.TotalDailyCases
+            })
+            .ToListAsync();
+            
         int total = 0;
         var model = new CaseTotalsModel()
         {
-            County = isState ? "" : location,
-            State = records.First().State,
-            Latitude = isState ? null : records.First().Latitude,
-            Longitude = isState ? null : records.First().Longitude,
+            County = location,
+            State = info?.State,
+            Latitude = info?.Latitude,
+            Longitude = info?.Longitude,
 
         };
 
@@ -68,22 +80,24 @@ public class RepoService : IRepoService
         bool isState = IsState(location);
         var query = GetBaseQuery(location, startDate, endDate, isState);
 
-        var records = await query.OrderBy(c => c.Date).ToListAsync();
-        double? growthRate = CalculateGrowthRate(records.First(), records.Last());
+        var first = (await query.TagWith("GetGrowthRate").OrderBy(c => c.Date).Take(1).ToListAsync()).FirstOrDefault<DailyCasesModel>();
+        var last = (await query.TagWith("GetGrowthRate").OrderByDescending(c => c.Date).Take(1).ToListAsync()).FirstOrDefault<DailyCasesModel>();
+
+        double? growthRate = CalculateGrowthRate(first, last);
 
         return new CaseGrowthRateModel()
         {
             GrowthRatePercent = growthRate,
             County = isState ? "" : location,
-            State = records.First().State,
-            Latitude = isState ? null : records.First().Latitude,
-            Longitude = isState ? null : records.First().Longitude
+            State = first.State,
+            Latitude = isState ? null : first?.Latitude,
+            Longitude = isState ? null : first?.Longitude
         };
     }
 
     public bool IsState(string location)
     {
-        return !_context.DailyCasesModel.Any(t => t.County == location);
+        return !_context.DailyCasesModel.TagWith("GetIsState").Any(t => t.County == location);
     }
 
     private double? CalculateGrowthRate(DailyCasesModel first, DailyCasesModel last)
@@ -99,20 +113,20 @@ public class RepoService : IRepoService
     private async Task<DailyCasesModel> GetMaxAsync(string location, DateTime? startDate, DateTime? endDate)
     {
         var query = GetBaseQuery(location, startDate, endDate, IsState(location));
-        return await query.OrderByDescending(c => c.TotalDailyCases).ThenBy(c => c.Date).FirstAsync();
+        return await query.TagWith("GetMaxQuery").OrderByDescending(c => c.TotalDailyCases).ThenBy(c => c.Date).FirstAsync();
     }
 
     private async Task<DailyCasesModel> GetMinAsync(string location, DateTime? startDate, DateTime? endDate)
     {
         var query = GetBaseQuery(location, startDate, endDate, IsState(location));
-        return await query.OrderBy(c => c.TotalDailyCases).ThenBy(c => c.Date).FirstAsync();
+        return await query.TagWith("GetMinQuery").OrderBy(c => c.TotalDailyCases).ThenBy(c => c.Date).FirstAsync();
     }
 
 
     private async Task<double> GetAverageAsync(string location, DateTime? startDate, DateTime? endDate)
     {
         var query = GetBaseQuery(location, startDate, endDate, IsState(location));
-        return await query.AverageAsync(c => c.TotalDailyCases);
+        return await query.TagWith("GetAvgQuery").AverageAsync(c => c.TotalDailyCases);
     }
 
     private IQueryable<DailyCasesModel> GetBaseQuery(string location, DateTime? startDate, DateTime? endDate, bool isState)
